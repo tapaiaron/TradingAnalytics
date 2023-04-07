@@ -1,8 +1,8 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
+import modules
+import functions
 
+def main():
+    data = functions.load_data()
 
-print("Hello World!")
-
-print("This is just the beginning!")
+if __name__ == "__main__":
+    main()
