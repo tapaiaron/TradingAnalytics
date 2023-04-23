@@ -170,3 +170,4 @@ def pred_interval(data,n=10):
     index_col['date']=index_col['Date']
     index_col.set_index('Date', inplace=True)
     ### Need to continue from here
+    #Plan: predict the vol, calculate back the potention option prices and then trade based off of that.
