@@ -74,9 +74,9 @@ class ImportModules:
 modules = ImportModules()
 
 # Functions to load data and calculate basic metrics
-def load_data_yahoo(tickerSymbol='META', start_date= (modules.datetime.date.today()-modules.relativedelta(years=20)).strftime('%Y-%m-%d'), end_date=(modules.datetime.date.today()-modules.datetime.timedelta(days=1)).strftime('%Y-%m-%d')):
+def load_data_yahoo(tickerSymbol='META',period='1d', start_date= (modules.datetime.date.today()-modules.relativedelta(years=20)).strftime('%Y-%m-%d'), end_date=(modules.datetime.date.today()-modules.datetime.timedelta(days=1)).strftime('%Y-%m-%d')):
     tickerData=modules.yf.Ticker(tickerSymbol)
-    data=tickerData.history(period='1d', start=start_date, end=end_date)
+    data=tickerData.history(period, start=start_date, end=end_date)
     return data
 
 def calc_log_return(data, mark_type='Close'):
@@ -122,6 +122,72 @@ def descriptive_stats(data):
     return f"Annual Average: {data['log_return'].mean()*252}, Annual Stdev: {data['log_return'].std()*modules.sqrt(252) } \n " \
            f"{data['log_return'].describe()} \n" \
 
+# Functions for modelling
+def pred_interval(data=data,n=10, day_type="1d"):
+    while (True):
+        try:
+            n=input("For how many months/weeks/days should the model predict for? (default=10 days)")
+            if n == "":
+                n=10
+            n=int(n)
+            break
+        except ValueError:
+            "The given value is not a number!"
+
+    last_date_idx=data.index[-1]
+    day_after_last_date_idx=last_date_idx+modules.datetime.timedelta(days=1)
+    fcast_dates=[]
+    for i in range(n):
+        fcast_dates.append(day_after_last_date_idx+modules.datetime.timedelta(days=i))
+    return n
+
+def day_conv(day_type="1d"):
+    dt=0
+    if day_type=="1d":
+         dt=1/252
+    elif day_type=="5d":
+        dt=1/52
+    elif day_type=="1m":
+        dt=1/12
+    else:
+        print(f"Given day_type is not valid i.e.({day_type})")
+    return dt
+
+def mc_model(data=data,n=pred_interval(),sim=10000,day_type="1d"):
+    n=pred_interval(data,day_type, n=10)
+    r_mean_ann=data['log_return'].mean()*252
+    r_std_ann=data['log_return'].std()*modules.sqrt(252)
+    simulation_dt=day_conv(day_type)
+    last_value=data[mark_type][-1]
+    sim_values=modules.np.zeros(shape=(n, sim))
+    log_return_mc_0=(r_mean_ann-0.5*r_std_ann**2)*simulation_dt+r_std_ann*modules.math.sqrt(simulation_dt)*modules.norm.ppf(modules.random.uniform(0, 1))
+    sim_values[0,:]=last_value*modules.math.exp(log_return_mc_0)
+    for i in range(1,sim):
+        for j in range(1,n):
+            sim_values[j,i]=sim_values[j-1,i]*modules.math.exp(((r_mean_ann-0.5*r_std_ann**2)*simulation_dt+r_std_ann*modules.math.sqrt(simulation_dt)*modules.norm.ppf(modules.random.uniform(0, 1))))
+
+    # Lower and upper bound for the predicted trajectory
+    min_values_mc = []
+    max_values_mc = []
+    for i in range(1, 11):
+        min_value_mc = min(sim_values[i-1,1:sim])
+        min_values_mc.append(min_value_mc)
+        max_value_mc = max(sim_values[i-1,1:sim])
+        max_values_mc.append(max_value_mc)
+    mc_mid_pred=[]
+    pred_mc_temp = zip(max_values_mc,min_values_mc)
+    for list1_mc_i, list2_mc_i in pred_mc_temp:
+        mc_mid_pred.append(list1_mc_i-list2_mc_i)
+    for i in range(1,11):
+        mc_mid_pred[i-1]=(mc_mid_pred[i-1]/2)+min_values_mc[i-1]
+
+
+
+
+
+    ### Need to continue from here
+    #Plan: predict the vol, calculate back the potention option prices and then trade based off of that.
+
 # Functions for plotting
 def plot_logr_price(data, tickerSymbol='META'):
     fig = modules.plt.figure(figsize=(7,4))
@@ -148,26 +214,23 @@ def plot_logr_price(data, tickerSymbol='META'):
     modules.plt.xticks(fontsize=12)
     modules.plt.show()
 
-# Functions for modelling
-def pred_interval(data,n=10):
-    while (True):
-        try:
-            n=input("For how many days should the model predict for? (default=10)")
-            if n == "":
-                n=10
-            n=int(n)
-            break
-        except ValueError:
-            "The given value is not a number!"
+def plot_predicted(model=mc_model(),interval=pred_interval()):
+    fig= modules.plt.figure(figsize=(6,4))
+    for i in range(1,sim):
+        modules.plt.plot(fcast_dates,sim_values[:,i], color="darkblue", alpha=0.2)
+    modules.plt.plot(fcast_dates, mc_mid_pred, linewidth=3, color="blue")
+    modules.plt.xlabel('Date', fontsize=12, labelpad=5)
+    modules.plt.ylabel('Price', fontsize=12, labelpad=5)
+    modules.plt.title(f'{tickerSymbol} Monte Carlo', fontsize=15, fontweight="bold", pad=10)
+    modules.plt.legend(loc='lower left', prop={'size': 9})
+    modules.plt.grid(True, linestyle='--')
+    modules.plt.xticks(fontsize=10)
+    modules.plt.yticks(fontsize=10)
+    fig.autofmt_xdate()
+    modules.plt.show()
 
-    last_date_idx=data.index[-1]
-    day_after_last_date_idx=last_date_idx+modules.datetime.timedelta(days=1)
-    fcast_dates=[]
-    for i in range(n):
-        fcast_dates.append(day_after_last_date_idx+modules.datetime.timedelta(days=i))
 
-    index_col=pd.DataFrame(index_col, columns=['Date'])
-    index_col['date']=index_col['Date']
-    index_col.set_index('Date', inplace=True)
-    ### Need to continue from here
-    #Plan: predict the vol, calculate back the potention option prices and then trade based off of that.
+
+
+
+
