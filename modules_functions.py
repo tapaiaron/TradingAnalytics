@@ -153,8 +153,7 @@ def day_conv(day_type="1d"):
         print(f"Given day_type is not valid i.e.({day_type})")
     return dt
 
-def mc_model(data,n=pred_interval(),sim=10000,day_type="1d"):
-    n=pred_interval(data,day_type, n=10)
+def mc_model(data,n,sim=10000,day_type="1d",mark_type='Close'):
     r_mean_ann=data['log_return'].mean()*252
     r_std_ann=data['log_return'].std()*modules.sqrt(252)
     simulation_dt=day_conv(day_type)
@@ -189,12 +188,12 @@ def mc_model(data,n=pred_interval(),sim=10000,day_type="1d"):
     #Plan: predict the vol, calculate back the potention option prices and then trade based off of that.
 
 # Functions for plotting
-def plot_logr_price(data, tickerSymbol='META'):
+def plot_logr_price(data, tickerSymbol='META', mark_type='Close'):
     fig = modules.plt.figure(figsize=(7,4))
     gs = fig.add_gridspec(2, hspace=0)
     axs = gs.subplots(sharex=True)
     fig.suptitle(f'{tickerSymbol}', size=25, fontweight='bold')
-    axs[0].plot(data.index, data['Close'], color='black', linewidth=2)
+    axs[0].plot(data.index, data[mark_type], color='black', linewidth=2)
     axs[1].plot(data.index, data['log_return'], color='darkblue', linewidth=2)
     axs[1].yaxis.tick_right()
     axs[0].set_ylabel('Price', fontsize=12, labelpad=5)
@@ -203,7 +202,7 @@ def plot_logr_price(data, tickerSymbol='META'):
     axs[1].set_ylabel('Log-return', fontsize=12, rotation=270, labelpad=15)
     axs[0].spines['bottom'].set_visible(False)
     axs[1].spines['top'].set_visible(False)
-    axs[0].set_yticks(modules.np.arange(min(data['Close']), max(data['Close']), (max(data['Close'])-min(data['Close']))*0.17))
+    axs[0].set_yticks(modules.np.arange(min(data[mark_type]), max(data[mark_type]), (max(data[mark_type])-min(data[mark_type]))*0.17))
     axs[1].set_yticks(modules.np.arange(min(data['log_return']), max(data['log_return']), (max(data['log_return'])-min(data['log_return']))*0.17))
     axs[1].tick_params(axis='y', labelsize=8.5)
     axs[0].tick_params(axis='y', labelsize=8.5)
@@ -214,7 +213,7 @@ def plot_logr_price(data, tickerSymbol='META'):
     modules.plt.xticks(fontsize=12)
     modules.plt.show()
 
-def plot_predicted(model=mc_model(),interval=pred_interval(), sim=10000):
+def plot_predicted(model,interval, sim=10000):
     fig= modules.plt.figure(figsize=(6,4))
     for i in range(1,sim):
         modules.plt.plot(fcast_dates,sim_values[:,i], color="darkblue", alpha=0.2)
