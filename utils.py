@@ -186,8 +186,60 @@ def mc_model(data,n,sim=10000,day_type="1d",mark_type='Close'):
     ### Need to continue from here
     #Plan: predict the vol, calculate back the potention option prices and then trade based off of that.
 
+
+def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_not="True", optimizer="True", combined="True"):
+    
+    if arma_or_not=="False":
+        def ARMA(optimizer):
+            if optimizer == True:
+                order_aic_bic=[]
+                for p in range(4):
+                    for q in range(4):
+                        try:
+                            model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p,1,q))
+                            results=model.fit()
+                            order_aic_bic.append((p,q,results.aic, results.bic))
+                        except:
+                            order_aic_bic.append((p,q, None, None))
+                order_df=pd.DataFrame(order_aic_bic, columns=['p', 'q', 'AIC', 'BIC'])
+                print(order_df.sort_values('AIC'))
+                print(order_df.sort_values('BIC'))
+                while (True):
+                    try:
+                        p_input=int(float(input('Give the first parameter for ARIMA(p,x,x): ')))
+                        d_input=int(float(input(f'Give the second parameter for ARIMA({p_input},d,x): ')))
+                        q_input=int(float(input(f'Give the third parameter for ARIMA({p_input},{d_input},q): ')))
+                        break
+                    except ValueError:
+                        print("Give whole number, maximum parameter limit is 3.")
+                        continue
+                model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p_input,d_input,q_input))
+                results=model.fit()
+                print(results.summary())
+                forecast=results.get_forecast(steps=n)
+                mean_forecast=np.exp(forecast.predicted_mean)
+                confidence_intervals=np.exp(forecast.conf_int())
+                lower_limits=confidence_intervals.loc[:,f"lower {mark_type}"]
+                upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
+            else:
+                p_input=1
+                d_input=1
+                q_input=1
+                model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p_input,d_input,q_input))
+                results=model.fit()
+                print(results.summary())
+                forecast=results.get_forecast(steps=n)
+                mean_forecast=np.exp(forecast.predicted_mean)
+                confidence_intervals=np.exp(forecast.conf_int())
+                lower_limits=confidence_intervals.loc[:,f"lower {mark_type}"]
+                upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
+        ARMA(optimizer)
+    else:
+        ARMA(optimizer)
+        
+
 # Functions for plotting
-def plot_logr_price(data, mark_type='Close'):
+def plot_logr_price(data,tickerSymbol, mark_type='Close'):
     fig = modules.plt.figure(figsize=(7,4))
     gs = fig.add_gridspec(2, hspace=0)
     axs = gs.subplots(sharex=True)
@@ -212,20 +264,26 @@ def plot_logr_price(data, mark_type='Close'):
     modules.plt.xticks(fontsize=12)
     modules.plt.show()
 
-def plot_predicted(data,mid,lower,upper, mark_type='Close', model_name='MC'):
-    fig= plt.figure(figsize=(8,4.5))
-    plt.plot(data.loc['2020':], data[mark_type].loc['2020':], label='Price', color='black', linewidth=2)
-    plt.plot(fcast_dates, mid, color='blue', label='Predicted', linewidth=3)
-    plt.fill_between(fcast_dates, lower, upper, color='grey', alpha=0.3)
-    plt.xlabel('Date', fontsize=15, labelpad=5)
-    plt.ylabel('Price', fontsize=15, labelpad=5)
-    plt.title(f'{tickerSymbol} {model_name}', fontsize=20, fontweight="bold", pad=10)
-    plt.legend(loc='lower left')
-    plt.grid(True, linestyle='--')
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
-    fig.autofmt_xdate()
-    plt.show()
+def plot_predicted(data, mid, lower, upper, fcast_dates, tickerSymbol, mark_type='Close', model_name='MC'):
+    try:
+        fig = modules.plt.figure(figsize=(8, 4.5))
+        modules.plt.plot(data.loc[modules.datetime.date.today()-modules.datetime.timedelta(days=31):, mark_type], label='Price', color='black', linewidth=2)
+        modules.plt.plot(fcast_dates, mid, color='blue', label='Predicted', linewidth=3)
+        modules.plt.fill_between(fcast_dates, lower, upper, color='grey', alpha=0.3)
+        modules.plt.xlabel('Date', fontsize=15, labelpad=5)
+        modules.plt.ylabel('Price', fontsize=15, labelpad=5)
+        modules.plt.title(f'{tickerSymbol} {model_name}', fontsize=20, fontweight="bold", pad=10)
+        modules.plt.legend(loc='lower left')
+        modules.plt.grid(True, linestyle='--')
+        modules.plt.xticks(fontsize=12)
+        modules.plt.yticks(fontsize=12)
+        fig.autofmt_xdate()
+        modules.plt.show()
+    except KeyError as e:
+        print(f"KeyError: {e}. Please ensure that the data and column are correctly specified.")
+    except Exception as e:
+        print(f"An error occurred: {e}.")
+
 
 
 
