@@ -11,6 +11,7 @@ def main():
 
     #Calling models
     utils.mc_model(data=df,sim=10000, n=n, day_type=day_type_user, mark_type=mark_type_user)
+    utils.plot_predicted(data=df, mid=mc_mid_pred, lower=min_values_mc, upper=max_values_mc)
 
 
 if __name__ == "__main__":
