@@ -187,221 +187,178 @@ def mc_model(data,n,sim=10000,day_type="1d",mark_type='Close'):
     #Plan: predict the vol, calculate back the potention option prices and then trade based off of that.
 
 
-def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_not="True", optimizer="True", combined="True"):
-    if combined == "False":
-        if arma_or_not=="False":
-            def ARMA(optimizer):
-                if optimizer == True:
-                    order_aic_bic=[]
-                    for p in range(4):
-                        for q in range(4):
-                            try:
-                                model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p,1,q))
-                                results=model.fit()
-                                order_aic_bic.append((p,q,results.aic, results.bic))
-                            except:
-                                order_aic_bic.append((p,q, None, None))
-                    order_df=pd.DataFrame(order_aic_bic, columns=['p', 'q', 'AIC', 'BIC'])
-                    print(order_df.sort_values('AIC'))
-                    print(order_df.sort_values('BIC'))
-                    while (True):
-                        try:
-                            p_input=int(float(input('Give the first parameter for ARIMA(p,x,x): ')))
-                            d_input=int(float(input(f'Give the second parameter for ARIMA({p_input},d,x): ')))
-                            q_input=int(float(input(f'Give the third parameter for ARIMA({p_input},{d_input},q): ')))
-                            break
-                        except ValueError:
-                            print("Give whole number, maximum parameter limit is 3.")
-                            continue
-                    model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p_input,d_input,q_input))
-                    results=model.fit()
-                    print(results.summary())
-                    forecast=results.get_forecast(steps=n)
-                    mean_forecast=np.exp(forecast.predicted_mean)
-                    confidence_intervals=np.exp(forecast.conf_int())
-                    lower_limits=confidence_intervals.loc[:,f"lower {mark_type}"]
-                    upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
-                else:
-                    p_input=1
-                    d_input=1
-                    q_input=1
-                    model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p_input,d_input,q_input))
-                    results=model.fit()
-                    print(results.summary())
-                    forecast=results.get_forecast(steps=n)
-                    mean_forecast=np.exp(forecast.predicted_mean)
-                    confidence_intervals=np.exp(forecast.conf_int())
-                    lower_limits=confidence_intervals.loc[:,f"lower {mark_type}"]
-                    upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
-            ARMA(optimizer)
-        else:
-            def GARCH(optimizer):
-                if optimizer == True:
-                    opcio_garch=["abs_r","Log_return_garch", "Eff_return_garch", "resid_arima_garch", "GARCH", "EGARCH","FIARCH","ARCH","HARCH", "normal", "t", "skewt","gaussian","studentst","skewstudent","ged","generalized error",  "AR", "constant","zero","LS","ARX","HAR","HARX", "", "0", "1"]
-                    opcio_log_eff=["Log_return_garch", "Eff_return_garch"]
-                    while (True):
-                        log_or_eff_or_arima=input('Hozamok (Log_return_garch)=ALAP vagy Abszolút Hozamok (abs_r) vagy ARIMA reziduum (resid_arima_garch): ') or 'Log_return_garch'
-                        if log_or_eff_or_arima in opcio_garch:
-                            pass
+def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_not="True",
+                    optimizer="True", combined="True", vol_type='GARCH', dist_type='normal',
+                    mean_type='constant', o_type=0):
+                    if combined == "False":
+                        if arma_or_not=="False":
+                            def ARMA(optimizer):
+                                if optimizer == True:
+                                    order_aic_bic=[]
+                                    for p in range(4):
+                                        for q in range(4):
+                                            try:
+                                                model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p,1,q))
+                                                results=model.fit()
+                                                order_aic_bic.append((p,q,results.aic, results.bic))
+                                            except:
+                                                order_aic_bic.append((p,q, None, None))
+                                    order_df=pd.DataFrame(order_aic_bic, columns=['p', 'q', 'AIC', 'BIC'])
+                                    print(order_df.sort_values('AIC'))
+                                    print(order_df.sort_values('BIC'))
+                                    while (True):
+                                        try:
+                                            p_input=int(float(input('Give the first parameter for ARIMA(p,x,x): ')))
+                                            d_input=int(float(input(f'Give the second parameter for ARIMA({p_input},d,x): ')))
+                                            q_input=int(float(input(f'Give the third parameter for ARIMA({p_input},{d_input},q): ')))
+                                            break
+                                        except ValueError:
+                                            print("Give whole number, maximum parameter limit is 3.")
+                                            continue
+                                    model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p_input,d_input,q_input))
+                                    results=model.fit()
+                                    print(results.summary())
+                                    forecast=results.get_forecast(steps=n)
+                                    mean_forecast=np.exp(forecast.predicted_mean)
+                                    confidence_intervals=np.exp(forecast.conf_int())
+                                    lower_limits=confidence_intervals.loc[:,f"lower {mark_type}"]
+                                    upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
+                                else:
+                                    p_input=1
+                                    d_input=1
+                                    q_input=1
+                                    model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p_input,d_input,q_input))
+                                    results=model.fit()
+                                    print(results.summary())
+                                    forecast=results.get_forecast(steps=n)
+                                    mean_forecast=np.exp(forecast.predicted_mean)
+                                    confidence_intervals=np.exp(forecast.conf_int())
+                                    lower_limits=confidence_intervals.loc[:,f"lower {mark_type}"]
+                                    upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
+                            ARMA(optimizer)
                         else:
-                            continue	
-                        vol_type=input('Volatilitás típus("GARCH", "EGARCH"...) - (alap=GARCH): ') or 'GARCH'
-                        if vol_type in opcio_garch:
-                            pass
-                        else:
-                            continue
-                        dist_type=input('Eloszlás típus("normal", "t", "skewt"...) - (alap=t): ') or 'normal'
-                        if dist_type in opcio_garch:
-                            pass
-                        else:
-                            continue
-                        mean_type=input('Drift típus("AR","constant","ARX"...) - (alap=None): ') or ''
-                        if mean_type in opcio_garch:
-                            pass
-                        else:
-                            continue
-                        o_type=input('"O" értéke (lag - asszimetrikus komponens) - (alap=0, 1=GJR): ') or "0"
-                        if o_type in opcio_garch:
-                            o_type=int(float(o_type))
-                            break
-                        else:
-                            continue
+                            def GARCH(optimizer):
+                                data['log_return_garch']=data['log_return'].mull(100)
+                                if optimizer == True:
+                                    order_aic_bic_garch=[]
+                                    for p_garch in range(4):
+                                        for q_garch in range(4):
+                                            try:
+                                                model_garch=modules.arch_model(data['log_return_garch'], p=p_garch, q=q_garch, o=o_type, vol=vol_type, dist=dist_type, mean=mean_type)
+                                                results_garch_test=model_garch.fit(disp='off')
+                                                order_aic_bic_garch.append((p_garch,q_garch,results_garch_test.aic, results_garch_test.bic))
+                                            except:
+                                                order_aic_bic_garch.append((p,q, None, None))
+                                    order_garch_df=pd.DataFrame(order_aic_bic_garch, columns=['p', 'q', 'AIC', 'BIC'])
+                                    print(order_garch_df.sort_values('AIC'))
+                                    print(order_garch_df.sort_values('BIC'))
 
-                    ##########################################################################
+                                    while (True):
+                                        try:
+                                            p_input_garch=int(float(input('Give the first parameter for GARCH(p,x)-t: ')))
+                                            q_input_garch=int(float(input(f"Give the second parameter for GARCH({p_input_garch},q)-t: ")))
+                                            break
+                                        except ValueError:
+                                            print("Give whole number, maximum parameter limit is 3.")
+                                            continue
 
-                    # if log_or_eff_or_arima in opcio_log_eff:
-                    # 	if mean_type =='':
-                    # 		gm=arch_model(df[log_or_eff_or_arima], p=1, q=1, o=o_type, vol=vol_type, dist=dist_type )
-                    # 	else:
-                    # 		gm=arch_model(df[log_or_eff_or_arima], p=1, q=1, o=o_type, vol=vol_type, dist=dist_type, mean=mean_type)
-                    # elif log_or_eff_or_arima not in opcio_log_eff and log_or_eff_or_arima != "resid_arima_garch":
-                    # 	if mean_type =='':
-                    # 		gm=arch_model(abs_r, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type)
-                    # 	else:
-                    # 		gm=arch_model(abs_r, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type, mean=mean_type)
-                    # else:
-                    # 	if mean_type =='':
-                    # 		gm=arch_model(resid_arima_garch, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type)
-                    # 	else:
-                    # 		gm=arch_model(resid_arima_garch, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type, mean=mean_type)
+                                    gm_rev=modules.arch(data['log_return_garch'], p=p_input_garch, q=q_input_garch, o=o_type, vol=vol_type, dist=dist_type)
+                                    gm_rev_result=gm_rev.fit(disp='off')
+                                    print(gm_rev_result.summary())
+
+                                    ##GARCH-parameter 
+                                    omega=gm_rev_result.params['omega']
+                                    alpha=gm_rev_result.params['alpha[1]']
+                                    beta=gm_rev_result.params['beta[1]']
+                                    print(mu, phi1,theta1, omega, alpha, beta)
+                                    sigma_t=np.sqrt(omega + alpha * (gm_rev_result.resid**2).shift(1) + beta*(gm_rev_result.conditional_volatility**2).shift(1)) ##GARCH 1,1 sigma
+                                    epsilon_t=sigma_t*np.random.standard_normal(len(sigma_t))
+                                    df['forecast_garch']=mu+phi1*df['Log_return_garch'].shift(1)+epsilon_t+theta1*epsilon_t.shift(1)
+                                    df['sigma_t']=sigma_t
+
+                                    df['var_garch']=(mu+sigma_t*((norm.ppf(0.99))*-1))
+
+                                    df=df.dropna()
+                                    index_col=df.index.values.tolist()
+                                    index_col=pd.to_datetime(index_col)
+                                    index_col=pd.DataFrame(index_col, columns=['Date'])
+                                    index_col['date']=index_col['Date']
+                                    index_col.set_index('Date', inplace=True)
+
+                                    abs_r=abs(df['Log_return']) #
+                                    abs_r=abs_r*100
 
 
-                    ##Első fit, elemzés GARCH(1,1) - Legjobb átlalában
-                    # gm_result=gm.fit(disp='off')
-                    # print(gm_result.summary())
+                                    while (True):
+                                        log_or_eff_or_arima=input('Log vagy Effektív hozam alapján jelezzen előre (alap="Log")') or 'Log_return_garch'
+                                        if log_or_eff_or_arima in opcio_garch:
+                                            break
+                                        else:
+                                            continue	
+                                    if log_or_eff_or_arima in opcio_log_eff:
+                                        train=df[log_or_eff_or_arima]
+                                    else:
+                                        train=resid_arima_garch
+                                    if mean_type == '':
+                                        model_f=arch_model(train, p=p_input_garch, q=q_input_garch, o=o_type, vol = vol_type , dist = dist_type)
+                                    else:
+                                        model_f=arch_model(train, p=p_input_garch, q=q_input_garch, o=o_type, vol = vol_type , dist = dist_type, mean = mean_type)
+                                    model_f_fit = model_f.fit(disp='off')
 
-                    while (True):
-                        try:
-                            p_input_garch=int(float(input('Adja meg a végleges GARCH(p,x)-t: ')))
-                            q_input_garch=int(float(input(f"Adja meg a végleges GARCH({p_input_garch},q)-t: ")))
-                            o_input_garch=int(float(input(f'Adja meg a GARCH({p_input_garch},{q_input_garch}) O(lag) (GJR-GARCH) értékét: ')))
-                            break
-                        except ValueError:
-                            print("Egész számokat adjon meg a modell p és q rendjének, lehetőleg maximum 3-ig")
-                            continue
-                    if log_or_eff_or_arima in opcio_log_eff:
-                        if mean_type =='':
-                            gm_rev=arch_model(df[log_or_eff_or_arima], p=p_input_garch, q=q_input_garch, o=o_input_garch, vol=vol_type, dist=dist_type )
-                        else:
-                            gm_rev=arch_model(df[log_or_eff_or_arima], p=p_input_garch, q=q_input_garch, o=o_input_garch, vol=vol_type, dist=dist_type, mean=mean_type)
-                    elif log_or_eff_or_arima not in opcio_log_eff and log_or_eff_or_arima != "resid_arima_garch":
-                        if mean_type =='':
-                            gm_rev=arch_model(abs_r, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type)
-                        else:
-                            gm_rev=arch_model(abs_r, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type, mean=mean_type)
+                                    pred = model_f_fit.forecast(horizon=n)
+                                    pred_std = np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
+                                    pred_std=list(pred_std)
+                                    pred_return=np.zeros(shape=(10))
+                                    pred_return[0]= mu+phi1*df['Log_return'][-1]+pred_std[0]*np.random.standard_normal(1)+theta1*pred_std[0]*np.random.standard_normal(1)
+
+                                    bound_n=1000
+                                    bounds=np.zeros(shape=(10,bound_n))
+                                    bounds[0,:]=df['Close'][-1]*math.exp(pred_return[0])
+
+                                    for j in range(1,bound_n):
+                                        for i in range(1,10):
+                                            pred_return[i]=mu+phi1*pred_return[i-1]+pred_std[i]*np.random.standard_normal(1)+theta1*pred_std[i-1]*np.random.standard_normal(1)
+                                            bounds[i,j]=bounds[i-1,j]*math.exp(pred_return[i])
+
+                                    max_values_ar_garch = []
+                                    min_values_ar_garch = []
+                                    for i in range(1, 11):
+                                        min_value_ar_garch = min(bounds[i-1,1:bound_n])
+                                        min_values_ar_garch.append(min_value_ar_garch)
+                                        max_value_ar_garch = max(bounds[i-1,1:bound_n])
+                                        max_values_ar_garch.append(max_value_ar_garch)
+                                    difference=[]
+                                    pred_transform_middle = zip(max_values_ar_garch,min_values_ar_garch)
+                                    for list1_i, list2_i in pred_transform_middle:
+                                        difference.append(list1_i-list2_i)
+                                    for i in range(1,11):
+                                        difference[i-1]=(difference[i-1]/2)+min_values_ar_garch[i-1]
+                                else:
+                                    pass
+                            GARCH(optimizer)
                     else:
-                        if mean_type =='':
-                            gm_rev=arch_model(resid_arima_garch, p=p_input_garch, q=q_input_garch, o=o_input_garch, vol=vol_type, dist=dist_type)
-                        else:
-                            gm_rev=arch_model(resid_arima_garch, p=p_input_garch, q=q_input_garch, o=o_input_garch, vol=vol_type, dist=dist_type, mean=mean_type)
-
-                    gm_rev_result=gm_rev.fit(disp='off')
-                    print(gm_rev_result.summary())
-
-                    params_arima=results.params.index.values.tolist()
-                    mu=results.params['intercept']
-                    if 'ar.L1' in params_arima:
-                        phi1=results.params['ar.L1']
-                    else:
-                        phi1=0
-                    if 'ma.L1' in params_arima:
-                        theta1=results.params['ma.L1']
-                    else:
-                        theta1=0
-                    ##GARCH-paraméter (1,1)
-                    omega=gm_rev_result.params['omega']
-                    alpha=gm_rev_result.params['alpha[1]']
-                    beta=gm_rev_result.params['beta[1]']
-                    print(mu, phi1,theta1, omega, alpha, beta)
-                    sigma_t=np.sqrt(omega + alpha * (gm_rev_result.resid**2).shift(1) + beta*(gm_rev_result.conditional_volatility**2).shift(1)) ##GARCH 1,1 szórása
-                    epsilon_t=sigma_t*np.random.standard_normal(len(sigma_t))
-                    df['forecast_garch']=mu+phi1*df['Log_return_garch'].shift(1)+epsilon_t+theta1*epsilon_t.shift(1)
-                    df['sigma_t']=sigma_t
-
-                    df['var_garch']=(mu+sigma_t*((norm.ppf(0.99))*-1))
-
-                    df=df.dropna()
-                    index_col=df.index.values.tolist()
-                    index_col=pd.to_datetime(index_col)
-                    index_col=pd.DataFrame(index_col, columns=['Date'])
-                    index_col['date']=index_col['Date']
-                    index_col.set_index('Date', inplace=True)
-
-                    abs_r=abs(df['Log_return']) #Újra kell mert törölt az adatsorból
-                    abs_r=abs_r*100
-
-
-                    while (True):
-                        #Ahhoz hogy n napos előrejelzés legyen loghozam kell, ezért nem lehet rolling forecasttal sztem
-                        log_or_eff_or_arima=input('Log vagy Effektív hozam alapján jelezzen előre (alap="Log")') or 'Log_return_garch'
-                        if log_or_eff_or_arima in opcio_garch:
-                            break
-                        else:
-                            continue	
-                    if log_or_eff_or_arima in opcio_log_eff:
-                        train=df[log_or_eff_or_arima]
-                    else:
-                        train=resid_arima_garch
-                    if mean_type == '':
-                        model_f=arch_model(train, p=p_input_garch, q=q_input_garch, o=o_type, vol = vol_type , dist = dist_type)
-                    else:
-                        model_f=arch_model(train, p=p_input_garch, q=q_input_garch, o=o_type, vol = vol_type , dist = dist_type, mean = mean_type)
-                    model_f_fit = model_f.fit(disp='off')
-
-                    pred = model_f_fit.forecast(horizon=n)
-                    pred_std = np.sqrt((pred.variance.values[-1,:])/10000) #variancia 100*100 lesz
-                    pred_std=list(pred_std)
-                    pred_return=np.zeros(shape=(10))
-                    pred_return[0]= mu+phi1*df['Log_return'][-1]+pred_std[0]*np.random.standard_normal(1)+theta1*pred_std[0]*np.random.standard_normal(1)
-
-                    bound_n=1000
-                    bounds=np.zeros(shape=(10,bound_n))
-                    bounds[0,:]=df['Close'][-1]*math.exp(pred_return[0])
-
-                    for j in range(1,bound_n):
-                        for i in range(1,10):
-                            pred_return[i]=mu+phi1*pred_return[i-1]+pred_std[i]*np.random.standard_normal(1)+theta1*pred_std[i-1]*np.random.standard_normal(1)
-                            bounds[i,j]=bounds[i-1,j]*math.exp(pred_return[i])
-
-                    max_values_ar_garch = []
-                    min_values_ar_garch = []
-                    for i in range(1, 11):
-                        min_value_ar_garch = min(bounds[i-1,1:bound_n])
-                        min_values_ar_garch.append(min_value_ar_garch)
-                        max_value_ar_garch = max(bounds[i-1,1:bound_n])
-                        max_values_ar_garch.append(max_value_ar_garch)
-                    difference=[]
-                    pred_transform_middle = zip(max_values_ar_garch,min_values_ar_garch)
-                    for list1_i, list2_i in pred_transform_middle:
-                        difference.append(list1_i-list2_i)
-                    for i in range(1,11):
-                        difference[i-1]=(difference[i-1]/2)+min_values_ar_garch[i-1]
-                else:
-                    pass
-            GARCH(optimizer)
-    else:
-        ARMA(optimizer)
-        GARCH(optimizer)
+                        ARMA(optimizer)
+                        GARCH(optimizer)
+                                    #                         elif log_or_eff_or_arima not in opcio_log_eff and log_or_eff_or_arima != "resid_arima_garch":
+                                    #     if mean_type =='':
+                                    #         gm_rev=arch_model(abs_r, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type)
+                                    #     else:
+                                    #         gm_rev=arch_model(abs_r, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type, mean=mean_type)
+                                    # else:
+                                    #     if mean_type =='':
+                                    #         gm_rev=arch_model(resid_arima_garch, p=p_input_garch, q=q_input_garch, o=o_input_garch, vol=vol_type, dist=dist_type)
+                                    #     else:
+                                    #         gm_rev=arch_model(resid_arima_garch, p=p_input_garch, q=q_input_garch, o=o_input_garch, vol=vol_type, dist=dist_type, mean=mean_type)
+                                    # params_arima=results.params.index.values.tolist()
+                                    # mu=results.params['intercept']
+                                    # if 'ar.L1' in params_arima:
+                                    #     phi1=results.params['ar.L1']
+                                    # else:
+                                    #     phi1=0
+                                    # if 'ma.L1' in params_arima:
+                                    #     theta1=results.params['ma.L1']
+                                    # else:
+                                    #     theta1=0
 
 # Functions for plotting
 
