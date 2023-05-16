@@ -203,7 +203,7 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                                 order_aic_bic.append((p,q,results.aic, results.bic))
                                             except:
                                                 order_aic_bic.append((p,q, None, None))
-                                    order_df=pd.DataFrame(order_aic_bic, columns=['p', 'q', 'AIC', 'BIC'])
+                                    order_df=modules.pd.DataFrame(order_aic_bic, columns=['p', 'q', 'AIC', 'BIC'])
                                     print(order_df.sort_values('AIC'))
                                     print(order_df.sort_values('BIC'))
                                     while (True):
@@ -219,10 +219,30 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     results=model.fit()
                                     print(results.summary())
                                     forecast=results.get_forecast(steps=n)
-                                    mean_forecast=np.exp(forecast.predicted_mean)
-                                    confidence_intervals=np.exp(forecast.conf_int())
+                                    mean_forecast=modules.np.exp(forecast.predicted_mean)
+                                    confidence_intervals=modules.np.exp(forecast.conf_int())
                                     lower_limits=confidence_intervals.loc[:,f"lower {mark_type}"]
                                     upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
+                                    
+                                    params_arima=results.params.index.values.tolist()
+                                    mu=results.params['intercept']
+                                    if 'ar.L1' in params_arima:
+                                        phi1=results.params['ar.L1']
+                                    elif 'ar.L2' in params_arima:
+                                        phi2=results.params['ar.L2']
+                                    elif 'ar.L3' in params_arima['ar.L3']:
+                                        phi3=results.params['ar.L3']
+                                    else:
+                                        phi1=0
+                                    if 'ma.L1' in params_arima:
+                                        theta1=results.params['ma.L1']
+                                    elif 'ma.L2' in params_arima:
+                                        theta1=results.params['ma.L2']
+                                    elif 'ma.L3' in params_arima:
+                                        theta1=results.params['ma.L3']
+                                    else:
+                                        theta1=0
+
                                 else:
                                     p_input=1
                                     d_input=1
@@ -231,10 +251,29 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     results=model.fit()
                                     print(results.summary())
                                     forecast=results.get_forecast(steps=n)
-                                    mean_forecast=np.exp(forecast.predicted_mean)
-                                    confidence_intervals=np.exp(forecast.conf_int())
+                                    mean_forecast=modules.np.exp(forecast.predicted_mean)
+                                    confidence_intervals=modules.np.exp(forecast.conf_int())
                                     lower_limits=confidence_intervals.loc[:,f"lower {mark_type}"]
                                     upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
+                                    params_arima=results.params.index.values.tolist()
+                                    mu=results.params['intercept']
+                                    if 'ar.L1' in params_arima:
+                                        phi1=results.params['ar.L1']
+                                    elif 'ar.L2' in params_arima:
+                                        phi2=results.params['ar.L2']
+                                    elif 'ar.L3' in params_arima['ar.L3']:
+                                        phi3=results.params['ar.L3']
+                                    else:
+                                        phi1=0
+                                    if 'ma.L1' in params_arima:
+                                        theta1=results.params['ma.L1']
+                                    elif 'ma.L2' in params_arima:
+                                        theta1=results.params['ma.L2']
+                                    elif 'ma.L3' in params_arima:
+                                        theta1=results.params['ma.L3']
+                                    else:
+                                        theta1=0
+
                             ARMA(optimizer)
                         else:
                             def GARCH(optimizer):
@@ -268,9 +307,16 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
 
                                     ##GARCH-parameter 
                                     omega=gm_rev_result.params['omega']
-                                    alpha=gm_rev_result.params['alpha[1]']
-                                    beta=gm_rev_result.params['beta[1]']
-                                    print(mu, phi1,theta1, omega, alpha, beta)
+                                    for i in range(1,p_input_garch):
+                                        for i in range(1,q_input_garch):
+                                            if p_input_garch == 0:
+                                                local()[f'alpha_{0}']=0
+                                            elif q_input_garch == 0:
+                                                local()[f'beta_{0}']=0
+                                            else:
+                                                local()[f'alpha_{i}']=gm_rev_result.params[f'alpha{i}']
+                                                local()[f'beta_{i}']=gm_rev_result.params[f'beta{i}']
+                                    
                                     sigma_t=np.sqrt(omega + alpha * (gm_rev_result.resid**2).shift(1) + beta*(gm_rev_result.conditional_volatility**2).shift(1)) ##GARCH 1,1 sigma
                                     epsilon_t=sigma_t*np.random.standard_normal(len(sigma_t))
                                     df['forecast_garch']=mu+phi1*df['Log_return_garch'].shift(1)+epsilon_t+theta1*epsilon_t.shift(1)
