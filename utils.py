@@ -316,9 +316,21 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                             else:
                                                 local()[f'alpha_{i}']=gm_rev_result.params[f'alpha{i}']
                                                 local()[f'beta_{i}']=gm_rev_result.params[f'beta{i}']
-                                    
-                                    sigma_t=np.sqrt(omega + alpha * (gm_rev_result.resid**2).shift(1) + beta*(gm_rev_result.conditional_volatility**2).shift(1)) ##GARCH 1,1 sigma
+
+                                    # This aint gonna work...
+                                    alpha_temp=0
+                                    beta_temp=0
+                                    for i in range(0,p_input_garch):
+                                        alpha_temp=alpha_temp+f'alpha_{i}'*(gm_rev_result.resid**2).shift(i) 
+                                        for j in range(0, q_input_garch):
+                                            beta_temp=beta_temp+f'beta_{j}'*(gm_rev_result.conditional_volatility**2).shift(j)
+                                    sigma_t=modules.np.sqrt(omega+alpha_temp+beta_temp)
+
                                     epsilon_t=sigma_t*np.random.standard_normal(len(sigma_t))
+
+
+
+
                                     df['forecast_garch']=mu+phi1*df['Log_return_garch'].shift(1)+epsilon_t+theta1*epsilon_t.shift(1)
                                     df['sigma_t']=sigma_t
 
