@@ -167,7 +167,7 @@ def mc_model(data,n,sim=10000,day_type="1d",mark_type='Close'):
     # Lower and upper bound for the predicted trajectory
     min_values_mc = []
     max_values_mc = []
-    for i in range(1, 11):
+    for i in range(1, n+1):
         min_value_mc = min(sim_values[i-1,1:sim])
         min_values_mc.append(min_value_mc)
         max_value_mc = max(sim_values[i-1,1:sim])
@@ -176,7 +176,7 @@ def mc_model(data,n,sim=10000,day_type="1d",mark_type='Close'):
     pred_mc_temp = zip(max_values_mc,min_values_mc)
     for list1_mc_i, list2_mc_i in pred_mc_temp:
         mc_mid_pred.append(list1_mc_i-list2_mc_i)
-    for i in range(1,11):
+    for i in range(1,n+1):
         mc_mid_pred[i-1]=(mc_mid_pred[i-1]/2)+min_values_mc[i-1]
     return mc_mid_pred, min_values_mc, max_values_mc
 
@@ -187,18 +187,18 @@ def mc_model(data,n,sim=10000,day_type="1d",mark_type='Close'):
     #Plan: predict the vol, calculate back the potention option prices and then trade based off of that.
 
 
-def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_not="True",
-                    optimizer="True", combined="True", vol_type='GARCH', dist_type='normal',
-                    mean_type='constant', o_type=0):
-                    if combined == "False":
-                        if arma_or_not=="False":
-                            def ARMA(optimizer):
+def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_not=True,
+                    optimizer=True, combined=True, vol_type='GARCH', dist_type='normal',
+                    mean_type='constant', o_type=0, arma_resid=False):
+                    if combined == False:
+                        if arma_or_not==False:
+                            def ARMA(data, n, mark_type, optimizer):
                                 if optimizer == True:
                                     order_aic_bic=[]
                                     for p in range(4):
                                         for q in range(4):
                                             try:
-                                                model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p,1,q))
+                                                model=modules.SARIMAX(modules.np.log(data[mark_type]),trend='c', order=(p,1,q))
                                                 results=model.fit()
                                                 order_aic_bic.append((p,q,results.aic, results.bic))
                                             except:
@@ -213,41 +213,45 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                             q_input=int(float(input(f'Give the third parameter for ARIMA({p_input},{d_input},q): ')))
                                             break
                                         except ValueError:
-                                            print("Give whole number, maximum parameter limit is 3.")
+                                            print("Give whole number, parameter ideally should be less than 3.")
                                             continue
-                                    model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p_input,d_input,q_input))
-                                    results=model.fit()
-                                    print(results.summary())
-                                    forecast=results.get_forecast(steps=n)
-                                    mean_forecast=modules.np.exp(forecast.predicted_mean)
-                                    confidence_intervals=modules.np.exp(forecast.conf_int())
-                                    lower_limits=confidence_intervals.loc[:,f"lower {mark_type}"]
-                                    upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
-                                    
-                                    params_arima=results.params.index.values.tolist()
-                                    mu=results.params['intercept']
-                                    if 'ar.L1' in params_arima:
-                                        phi1=results.params['ar.L1']
-                                    elif 'ar.L2' in params_arima:
-                                        phi2=results.params['ar.L2']
-                                    elif 'ar.L3' in params_arima['ar.L3']:
-                                        phi3=results.params['ar.L3']
-                                    else:
-                                        phi1=0
-                                    if 'ma.L1' in params_arima:
-                                        theta1=results.params['ma.L1']
-                                    elif 'ma.L2' in params_arima:
-                                        theta1=results.params['ma.L2']
-                                    elif 'ma.L3' in params_arima:
-                                        theta1=results.params['ma.L3']
-                                    else:
-                                        theta1=0
 
+                                    model = modules.SARIMAX(modules.np.log(data[mark_type]), trend='c', order=(p_input, d_input, q_input))
+                                    results = model.fit()
+                                    print(results.summary())
+
+                                    forecast = results.get_forecast(steps=n)
+                                    mean_forecast = modules.np.exp(forecast.predicted_mean)
+                                    confidence_intervals = modules.np.exp(forecast.conf_int())
+                                    lower_limits = confidence_intervals.loc[:, f"lower {mark_type}"]
+                                    upper_limits = confidence_intervals.loc[:, f"upper {mark_type}"]
+
+                                    params_arima = results.params.index.values.tolist()
+                                    mu = results.params['intercept']
+
+                                    phi_params = []
+                                    for i in range(1, p_input + 1):
+                                        phi_key = f'ar.L{i}'
+                                        if phi_key in params_arima:
+                                            phi_params.append(results.params[phi_key])
+
+                                    phi = [phi_params[i] if i < len(phi_params) else 0 for i in range(p_input)]
+
+                                    theta_params = []
+                                    for i in range(1, q_input + 1):
+                                        theta_key = f'ma.L{i}'
+                                        if theta_key in params_arima:
+                                            theta_params.append(results.params[theta_key])
+
+                                    theta = [theta_params[i] if i < len(theta_params) else 0 for i in range(q_input)]
+
+                                    resid_arima=results.resid
+                                    resid_arima=resid_arima[1:]
                                 else:
                                     p_input=1
                                     d_input=1
                                     q_input=1
-                                    model=modules.SARIMAX(np.log(data[mark_type]),trend='c', order=(p_input,d_input,q_input))
+                                    model=modules.SARIMAX(modules.np.log(data[mark_type]),trend='c', order=(p_input,d_input,q_input))
                                     results=model.fit()
                                     print(results.summary())
                                     forecast=results.get_forecast(steps=n)
@@ -257,27 +261,18 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     upper_limits=confidence_intervals.loc[:,f"upper {mark_type}"]
                                     params_arima=results.params.index.values.tolist()
                                     mu=results.params['intercept']
-                                    if 'ar.L1' in params_arima:
-                                        phi1=results.params['ar.L1']
-                                    elif 'ar.L2' in params_arima:
-                                        phi2=results.params['ar.L2']
-                                    elif 'ar.L3' in params_arima['ar.L3']:
-                                        phi3=results.params['ar.L3']
-                                    else:
-                                        phi1=0
-                                    if 'ma.L1' in params_arima:
-                                        theta1=results.params['ma.L1']
-                                    elif 'ma.L2' in params_arima:
-                                        theta1=results.params['ma.L2']
-                                    elif 'ma.L3' in params_arima:
-                                        theta1=results.params['ma.L3']
-                                    else:
-                                        theta1=0
-
-                            ARMA(optimizer)
+                                    phi=results.params['ar.L1']
+                                    theta=results.params['ma.L1']
+                                    resid_arima=results.resid
+                                    resid_arima=resid_arima[1:]
+                                return mean_forecast, lower_limits, upper_limits, mu, phi, theta, resid_arima, p_input, q_input
                         else:
-                            def GARCH(optimizer):
-                                data['log_return_garch']=data['log_return'].mull(100)
+                            def GARCH(data, n, sim, day_type, mark_type, optimizer,vol_type, dist_type, mean_type, o_type, arma_resid):
+                                if arma_resid == False:
+                                    data['log_return_garch']=data['log_return'].mull(100)
+                                else:
+                                    resid_arima=ARMA(data, n, mark_type, optimizer)
+                                    data['log_return_garch']=resid_arima*100
                                 if optimizer == True:
                                     order_aic_bic_garch=[]
                                     for p_garch in range(4):
@@ -287,100 +282,63 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                                 results_garch_test=model_garch.fit(disp='off')
                                                 order_aic_bic_garch.append((p_garch,q_garch,results_garch_test.aic, results_garch_test.bic))
                                             except:
-                                                order_aic_bic_garch.append((p,q, None, None))
-                                    order_garch_df=pd.DataFrame(order_aic_bic_garch, columns=['p', 'q', 'AIC', 'BIC'])
+                                                order_aic_bic_garch.append((p_garch,q_garch, None, None))
+                                    order_garch_df=modules.pd.DataFrame(order_aic_bic_garch, columns=['p', 'q', 'AIC', 'BIC'])
                                     print(order_garch_df.sort_values('AIC'))
                                     print(order_garch_df.sort_values('BIC'))
 
                                     while (True):
                                         try:
-                                            p_input_garch=int(float(input('Give the first parameter for GARCH(p,x)-t: ')))
-                                            q_input_garch=int(float(input(f"Give the second parameter for GARCH({p_input_garch},q)-t: ")))
+                                            p_input_garch = int(float(input('Give the first parameter for GARCH(p,x)-t: ')))
+                                            q_input_garch = int(float(input(f"Give the second parameter for GARCH({p_input_garch},q)-t: ")))
                                             break
                                         except ValueError:
-                                            print("Give whole number, maximum parameter limit is 3.")
-                                            continue
+                                                print("Give whole number, maximum parameter ideally should be less than 3.")
+                                                continue
 
                                     gm_rev=modules.arch(data['log_return_garch'], p=p_input_garch, q=q_input_garch, o=o_type, vol=vol_type, dist=dist_type)
                                     gm_rev_result=gm_rev.fit(disp='off')
                                     print(gm_rev_result.summary())
-
-                                    ##GARCH-parameter 
-                                    omega=gm_rev_result.params['omega']
-                                    for i in range(1,p_input_garch):
-                                        for i in range(1,q_input_garch):
-                                            if p_input_garch == 0:
-                                                local()[f'alpha_{0}']=0
-                                            elif q_input_garch == 0:
-                                                local()[f'beta_{0}']=0
-                                            else:
-                                                local()[f'alpha_{i}']=gm_rev_result.params[f'alpha{i}']
-                                                local()[f'beta_{i}']=gm_rev_result.params[f'beta{i}']
-
-                                    # This aint gonna work...
-                                    alpha_temp=0
-                                    beta_temp=0
-                                    for i in range(0,p_input_garch):
-                                        alpha_temp=alpha_temp+f'alpha_{i}'*(gm_rev_result.resid**2).shift(i) 
-                                        for j in range(0, q_input_garch):
-                                            beta_temp=beta_temp+f'beta_{j}'*(gm_rev_result.conditional_volatility**2).shift(j)
-                                    sigma_t=modules.np.sqrt(omega+alpha_temp+beta_temp)
-
-                                    epsilon_t=sigma_t*np.random.standard_normal(len(sigma_t))
-
-
-
-
-                                    df['forecast_garch']=mu+phi1*df['Log_return_garch'].shift(1)+epsilon_t+theta1*epsilon_t.shift(1)
-                                    df['sigma_t']=sigma_t
-
-                                    df['var_garch']=(mu+sigma_t*((norm.ppf(0.99))*-1))
-
-                                    df=df.dropna()
-                                    index_col=df.index.values.tolist()
-                                    index_col=pd.to_datetime(index_col)
-                                    index_col=pd.DataFrame(index_col, columns=['Date'])
-                                    index_col['date']=index_col['Date']
-                                    index_col.set_index('Date', inplace=True)
-
-                                    abs_r=abs(df['Log_return']) #
-                                    abs_r=abs_r*100
-
-
-                                    while (True):
-                                        log_or_eff_or_arima=input('Log vagy Effektív hozam alapján jelezzen előre (alap="Log")') or 'Log_return_garch'
-                                        if log_or_eff_or_arima in opcio_garch:
-                                            break
-                                        else:
-                                            continue	
-                                    if log_or_eff_or_arima in opcio_log_eff:
-                                        train=df[log_or_eff_or_arima]
+                                    ## GARCH parameters
+                                    mu_garch = gm_rev_result.params['intercept']
+                                    omega = gm_rev_result.params['omega']
+                                    alpha_params = [gm_rev_result.params.get(f'alpha{i}', 0) for i in range(1, p_input_garch + 1)]
+                                    beta_params = [gm_rev_result.params.get(f'beta{i}', 0) for i in range(1, q_input_garch + 1)]
+                                    alpha_temp = [sum(alpha_params[i] * (gm_rev_result.resid**2).shift(i)[t] for i in range(p_input_garch)) for t in range(len(data))]
+                                    beta_temp = [sum(beta_params[j] * (gm_rev_result.conditional_volatility**2).shift(j)[t] for j in range(q_input_garch)) for t in range(len(data))]
+                                    ## GARCH estimation
+                                    sigma_t = modules.np.sqrt(omega + alpha_temp + beta_temp)
+                                    if dist_type=="normal":
+                                        epsilon_t=sigma_t*modules.np.random.standard_normal(len(sigma_t))
+                                    elif dist_type=="t":
+                                        nu=gm_rev_result.params['nu']
+                                        epsilon_t=sigma_t*modules.np.random.standard_t(nu,len(sigma_t))
                                     else:
-                                        train=resid_arima_garch
-                                    if mean_type == '':
-                                        model_f=arch_model(train, p=p_input_garch, q=q_input_garch, o=o_type, vol = vol_type , dist = dist_type)
-                                    else:
-                                        model_f=arch_model(train, p=p_input_garch, q=q_input_garch, o=o_type, vol = vol_type , dist = dist_type, mean = mean_type)
-                                    model_f_fit = model_f.fit(disp='off')
-
-                                    pred = model_f_fit.forecast(horizon=n)
-                                    pred_std = np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
+                                        print("Distribution type is not valid, try i.e. normal, t, skewt...")
+                                        return
+                                    ## GARCH prediction
+                                    pred = gm_rev_result.forecast(horizon=n)
+                                    pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
                                     pred_std=list(pred_std)
-                                    pred_return=np.zeros(shape=(10))
-                                    pred_return[0]= mu+phi1*df['Log_return'][-1]+pred_std[0]*np.random.standard_normal(1)+theta1*pred_std[0]*np.random.standard_normal(1)
+                                    pred_return=modules.np.zeros(shape=(n))
 
-                                    bound_n=1000
-                                    bounds=np.zeros(shape=(10,bound_n))
-                                    bounds[0,:]=df['Close'][-1]*math.exp(pred_return[0])
+                                    if dist_type=="normal":
+                                        pred_return[0]= mu_garch+pred_std[0]*modules.np.random.standard_normal(1)
+                                    elif dist_type=="t":
+                                        pred_return[0]= mu_garch+pred_std[0]*modules.np.random.standard_normal(1)
 
+
+                                    ## Setting the upper and lower bound
+                                    bound_n=sim
+                                    bounds=modules.np.zeros(shape=(n,bound_n))
+                                    bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0])
                                     for j in range(1,bound_n):
-                                        for i in range(1,10):
-                                            pred_return[i]=mu+phi1*pred_return[i-1]+pred_std[i]*np.random.standard_normal(1)+theta1*pred_std[i-1]*np.random.standard_normal(1)
-                                            bounds[i,j]=bounds[i-1,j]*math.exp(pred_return[i])
-
+                                        for i in range(1,n):
+                                            pred_return[i]=mu_garch+pred_std[i]*modules.np.random.standard_normal(1)
+                                            bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i])
                                     max_values_ar_garch = []
                                     min_values_ar_garch = []
-                                    for i in range(1, 11):
+                                    for i in range(1, n+1):
                                         min_value_ar_garch = min(bounds[i-1,1:bound_n])
                                         min_values_ar_garch.append(min_value_ar_garch)
                                         max_value_ar_garch = max(bounds[i-1,1:bound_n])
@@ -389,34 +347,93 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     pred_transform_middle = zip(max_values_ar_garch,min_values_ar_garch)
                                     for list1_i, list2_i in pred_transform_middle:
                                         difference.append(list1_i-list2_i)
-                                    for i in range(1,11):
+                                    for i in range(1,n+1):
                                         difference[i-1]=(difference[i-1]/2)+min_values_ar_garch[i-1]
-                                else:
-                                    pass
-                            GARCH(optimizer)
+                                else:          
+                                    p_input_garch = 1
+                                    q_input_garch = 1
+                                    gm_rev=modules.arch(data['log_return_garch'], p=p_input_garch, q=q_input_garch, o=o_type, vol=vol_type, dist=dist_type)
+                                    gm_rev_result=gm_rev.fit(disp='off')
+                                    print(gm_rev_result.summary())
+                                    ## GARCH parameters
+                                    mu_garch = gm_rev_result.params['intercept']
+                                    omega = gm_rev_result.params['omega']
+                                    alpha_params = gm_rev_result.params['alpha[1]']
+                                    beta_params = gm_rev_result.params['beta[1]']
+                                    alpha_temp = alpha_params * (gm_rev_result.resid**2).shift(1)
+                                    beta_temp = beta_params * (gm_rev_result.conditional_volatility**2).shift(1)
+                                    ## GARCH estimation **
+                                    sigma_t = modules.np.sqrt(omega + alpha_params*(gm_rev_result.resid**2).shift(1) + beta_params*(gm_rev_result.conditional_volatility**2).shift(1))
+                                    epsilon_t=sigma_t*modules.np.random.standard_normal(len(sigma_t))
+                                    ## GARCH prediction
+                                    pred = gm_rev_result.forecast(horizon=n)
+                                    pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
+                                    pred_std=list(pred_std)
+                                    pred_return=modules.np.zeros(shape=(n))
+                                    pred_return[0]= mu_garch+pred_std[0]*modules.np.random.standard_normal(1)
+                                    ## Setting the upper and lower bound
+                                    bound_n=sim
+                                    bounds=modules.np.zeros(shape=(n,bound_n))
+                                    bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0])
+                                    for j in range(1,bound_n):
+                                        for i in range(1,n):
+                                            pred_return[i]=mu_garch+pred_std[i]*modules.np.random.standard_normal(1)
+                                            bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i])
+                                    max_values_ar_garch = []
+                                    min_values_ar_garch = []
+                                    for i in range(1, n+1):
+                                        min_value_ar_garch = min(bounds[i-1,1:bound_n])
+                                        min_values_ar_garch.append(min_value_ar_garch)
+                                        max_value_ar_garch = max(bounds[i-1,1:bound_n])
+                                        max_values_ar_garch.append(max_value_ar_garch)
+                                    difference=[]
+                                    pred_transform_middle = zip(max_values_ar_garch,min_values_ar_garch)
+                                    for list1_i, list2_i in pred_transform_middle:
+                                        difference.append(list1_i-list2_i)
+                                    for i in range(1,n+1):
+                                        difference[i-1]=(difference[i-1]/2)+min_values_ar_garch[i-1]
+                            return difference, min_values_ar_garch, max_values_ar_garch, sigma_t, epsilon_t, alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred     
                     else:
-                        ARMA(optimizer)
-                        GARCH(optimizer)
-                                    #                         elif log_or_eff_or_arima not in opcio_log_eff and log_or_eff_or_arima != "resid_arima_garch":
-                                    #     if mean_type =='':
-                                    #         gm_rev=arch_model(abs_r, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type)
-                                    #     else:
-                                    #         gm_rev=arch_model(abs_r, p=1, q=1, o=o_type, vol=vol_type, dist=dist_type, mean=mean_type)
-                                    # else:
-                                    #     if mean_type =='':
-                                    #         gm_rev=arch_model(resid_arima_garch, p=p_input_garch, q=q_input_garch, o=o_input_garch, vol=vol_type, dist=dist_type)
-                                    #     else:
-                                    #         gm_rev=arch_model(resid_arima_garch, p=p_input_garch, q=q_input_garch, o=o_input_garch, vol=vol_type, dist=dist_type, mean=mean_type)
-                                    # params_arima=results.params.index.values.tolist()
-                                    # mu=results.params['intercept']
-                                    # if 'ar.L1' in params_arima:
-                                    #     phi1=results.params['ar.L1']
-                                    # else:
-                                    #     phi1=0
-                                    # if 'ma.L1' in params_arima:
-                                    #     theta1=results.params['ma.L1']
-                                    # else:
-                                    #     theta1=0
+                        mu, phi, theta, resid_arima, p_input, q_input=ARMA(data, n, mark_type, optimizer)
+                        alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred=GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type)
+
+                        sigma_t = modules.np.sqrt(omega + alpha_temp + beta_temp)
+                        epsilon_t=sigma_t*modules.np.random.standard_normal(len(sigma_t))
+
+                        phi_temp = [sum(phi[i] * data['Log_return_garch'].shift(i)[t] for i in range(p_input)) for t in range(len(data))]
+                        theta_temp = [sum(theta[j] * epsilon_t.shift(j)[t] for j in range(q_input)) for t in range(len(data))]
+
+                        arma_garch_est = mu + phi_temp + epsilon_t + theta_temp
+
+                        pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000)
+                        pred_std=list(pred_std)
+                        pred_return=modules.np.zeros(shape=(n))
+                        pred_return[0]= mu+[sum(phi[i]*data['Log_return_garch'].shift(1)[t] for i in range(p_input)) for t in range(len(data))]+pred_std[0]*modules.np.random.standard_normal(1)+[sum(theta[j]*pred_std[0]*modules.np.random.standard_normal(1)[t] for j in range(q_input)) for t in range(len(data))]
+
+                        bound_n=sim
+                        bounds=modules.np.zeros(shape=(n,bound_n))
+                        bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0])
+
+                        for j in range(1,bound_n):
+                            for i in range(1,n):
+                                pred_return[i]=mu+[sum(phi[k]*pred_return[i-1][t] for k in range(p_input)) for t in range(n+1)]+pred_std[i]*modules.np.random.standard_normal(1)+[sum(theta[k]*pred_std[i-1]*modules.np.random.standard_normal(1)[t] for k in range(q_input)) for t in range(n+1))]
+                                bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i])
+                        max_values_ar_garch = []
+                        min_values_ar_garch = []
+                        for i in range(1, n+1):
+                            min_value_ar_garch = min(bounds[i-1,1:bound_n])
+                            min_values_ar_garch.append(min_value_ar_garch)
+                            max_value_ar_garch = max(bounds[i-1,1:bound_n])
+                            max_values_ar_garch.append(max_value_ar_garch)
+                        difference=[]
+                        pred_transform_middle = zip(max_values_ar_garch,min_values_ar_garch)
+                        for list1_i, list2_i in pred_transform_middle:
+                            difference.append(list1_i-list2_i)
+                        for i in range(1,n+1):
+                            difference[i-1]=(difference[i-1]/2)+min_values_ar_garch[i-1]
+                    return difference, max_values_ar_garch, min_values_ar_garch
+
+
 
 # Functions for plotting
 
