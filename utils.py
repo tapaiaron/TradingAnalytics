@@ -191,7 +191,7 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                     optimizer=True, combined=True, vol_type='GARCH', dist_type='normal',
                     mean_type='constant', o_type=0, arma_resid=False):
                     if combined == False:
-                        if arma_or_not==False:
+                        if arma_or_not==True:
                             def ARMA(data, n, mark_type, optimizer):
                                 if optimizer == True:
                                     order_aic_bic=[]
