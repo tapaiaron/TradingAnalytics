@@ -320,22 +320,34 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     pred = gm_rev_result.forecast(horizon=n)
                                     pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
                                     pred_std=list(pred_std)
-                                    pred_return=modules.np.zeros(shape=(n))
+                                    
+                                    pred_return=modules.np.zeros(shape=(n,bound_n))
+                                    bound_n=sim
+                                    bounds=modules.np.zeros(shape=(n,bound_n))
 
-                                    if dist_type=="normal":
-                                        pred_return[0]= mu_garch+pred_std[0]*modules.np.random.standard_normal(1)
-                                    elif dist_type=="t":
-                                        pred_return[0]= mu_garch+pred_std[0]*modules.np.random.standard_normal(1)
+                                    if dist_type == "normal":
+                                        pred_return[0,:]= mu_garch+pred_std[0]*modules.np.random.standard_normal(1)
+                                    elif dist_type == "t":
+                                        pred_return[0,:]= mu_garch+pred_std[0]*modules.np.random.standard_t(nu, 1)
+                                    else:
+                                        print("Distribution type is not valid, try i.e. normal, t, skewt...")
+                                        return
 
 
                                     ## Setting the upper and lower bound
-                                    bound_n=sim
-                                    bounds=modules.np.zeros(shape=(n,bound_n))
-                                    bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0])
-                                    for j in range(1,bound_n):
-                                        for i in range(1,n):
-                                            pred_return[i]=mu_garch+pred_std[i]*modules.np.random.standard_normal(1)
-                                            bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i])
+                                    bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0,0])
+
+                                    for i in range(1,n):
+                                        for j in range(1,bound_n):
+                                            if dist_type == "normal":
+                                                pred_return[i,j]=mu_garch+pred_std[i-1]*modules.np.random.standard_normal((1))
+                                            elif dist_type == "t":
+                                                pred_return[i,j]=mu_garch+pred_std[i-1]*modules.np.random.standard_t(nu,1)
+                                            else:
+                                                print("Distribution type is not valid, try i.e. normal, t, skewt...")
+                                                return
+                                            bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i,j])
+
                                     max_values_ar_garch = []
                                     min_values_ar_garch = []
                                     for i in range(1, n+1):
@@ -343,12 +355,12 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                         min_values_ar_garch.append(min_value_ar_garch)
                                         max_value_ar_garch = max(bounds[i-1,1:bound_n])
                                         max_values_ar_garch.append(max_value_ar_garch)
+
                                     difference=[]
-                                    pred_transform_middle = zip(max_values_ar_garch,min_values_ar_garch)
-                                    for list1_i, list2_i in pred_transform_middle:
-                                        difference.append(list1_i-list2_i)
-                                    for i in range(1,n+1):
-                                        difference[i-1]=(difference[i-1]/2)+min_values_ar_garch[i-1]
+
+                                    for i in range(1, n+1):
+                                        temp_avg=sum(bounds[i-1,1:bound_n])/bound_n
+                                        difference.append(temp_avg)
                                 else:          
                                     p_input_garch = 1
                                     q_input_garch = 1
@@ -362,23 +374,40 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     beta_params = gm_rev_result.params['beta[1]']
                                     alpha_temp = alpha_params * (gm_rev_result.resid**2).shift(1)
                                     beta_temp = beta_params * (gm_rev_result.conditional_volatility**2).shift(1)
-                                    ## GARCH estimation **
+                                    ## GARCH estimation
                                     sigma_t = modules.np.sqrt(omega + alpha_params*(gm_rev_result.resid**2).shift(1) + beta_params*(gm_rev_result.conditional_volatility**2).shift(1))
                                     epsilon_t=sigma_t*modules.np.random.standard_normal(len(sigma_t))
                                     ## GARCH prediction
                                     pred = gm_rev_result.forecast(horizon=n)
                                     pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
                                     pred_std=list(pred_std)
-                                    pred_return=modules.np.zeros(shape=(n))
-                                    pred_return[0]= mu_garch+pred_std[0]*modules.np.random.standard_normal(1)
-                                    ## Setting the upper and lower bound
+
+                                    pred_return=modules.np.zeros(shape=(n,bound_n))
                                     bound_n=sim
                                     bounds=modules.np.zeros(shape=(n,bound_n))
-                                    bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0])
-                                    for j in range(1,bound_n):
-                                        for i in range(1,n):
-                                            pred_return[i]=mu_garch+pred_std[i]*modules.np.random.standard_normal(1)
-                                            bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i])
+
+                                    if dist_type == "normal":
+                                        pred_return[0,:]= mu_garch+pred_std[0]*modules.np.random.standard_normal(1)
+                                    elif dist_type == "t":
+                                        pred_return[0,:]= mu_garch+pred_std[0]*modules.np.random.standard_t(nu, 1)
+                                    else:
+                                        print("Distribution type is not valid, try i.e. normal, t, skewt...")
+                                        return
+
+                                    ## Setting the upper and lower bound
+                                    bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0,0])
+
+                                    for i in range(1,n):
+                                        for j in range(1,bound_n):
+                                            if dist_type == "normal":
+                                                pred_return[i,j]=mu_garch+pred_std[i-1]*modules.np.random.standard_normal((1))
+                                            elif dist_type == "t":
+                                                pred_return[i,j]=mu_garch+pred_std[i-1]*modules.np.random.standard_t(nu,1)
+                                            else:
+                                                print("Distribution type is not valid, try i.e. normal, t, skewt...")
+                                                return
+                                            bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i,j])
+
                                     max_values_ar_garch = []
                                     min_values_ar_garch = []
                                     for i in range(1, n+1):
@@ -386,38 +415,63 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                         min_values_ar_garch.append(min_value_ar_garch)
                                         max_value_ar_garch = max(bounds[i-1,1:bound_n])
                                         max_values_ar_garch.append(max_value_ar_garch)
+
                                     difference=[]
-                                    pred_transform_middle = zip(max_values_ar_garch,min_values_ar_garch)
-                                    for list1_i, list2_i in pred_transform_middle:
-                                        difference.append(list1_i-list2_i)
-                                    for i in range(1,n+1):
-                                        difference[i-1]=(difference[i-1]/2)+min_values_ar_garch[i-1]
-                            return difference, min_values_ar_garch, max_values_ar_garch, sigma_t, epsilon_t, alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred     
+
+                                    for i in range(1, n+1):
+                                        temp_avg=sum(bounds[i-1,1:bound_n])/bound_n
+                                        difference.append(temp_avg)
+
+                            return difference, min_values_ar_garch, max_values_ar_garch, sigma_t, epsilon_t, alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred, nu   
                     else:
                         mu, phi, theta, resid_arima, p_input, q_input=ARMA(data, n, mark_type, optimizer)
                         alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred=GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type)
 
+                        if dist_type == "normal":
+                            pass
+                        elif dist_type == "t":
+                            nu=GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type)
+                        else:
+                            print("Distribution type is not valid, try i.e. normal, t, skewt...")
+                            return
+
                         sigma_t = modules.np.sqrt(omega + alpha_temp + beta_temp)
-                        epsilon_t=sigma_t*modules.np.random.standard_normal(len(sigma_t))
+                        if dist_type == "normal":
+                            epsilon_t=sigma_t*modules.np.random.standard_normal(len(sigma_t))
+                        elif dist_type == "t":
+                            epsilon_t=sigma_t*modules.np.random.standard_t(nu,len(sigma_t))
+                        else:
+                            print("Distribution type is not valid, try i.e. normal, t, skewt...")
+                            return
+                        
 
                         phi_temp = [sum(phi[i] * data['Log_return_garch'].shift(i)[t] for i in range(p_input)) for t in range(len(data))]
                         theta_temp = [sum(theta[j] * epsilon_t.shift(j)[t] for j in range(q_input)) for t in range(len(data))]
 
                         arma_garch_est = mu + phi_temp + epsilon_t + theta_temp
-
                         pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000)
                         pred_std=list(pred_std)
-                        pred_return=modules.np.zeros(shape=(n))
-                        pred_return[0]= mu+[sum(phi[i]*data['Log_return_garch'].shift(1)[t] for i in range(p_input)) for t in range(len(data))]+pred_std[0]*modules.np.random.standard_normal(1)+[sum(theta[j]*pred_std[0]*modules.np.random.standard_normal(1)[t] for j in range(q_input)) for t in range(len(data))]
 
                         bound_n=sim
+                        pred_return=modules.np.zeros(shape=(n,bound_n))
                         bounds=modules.np.zeros(shape=(n,bound_n))
-                        bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0])
 
-                        for j in range(1,bound_n):
-                            for i in range(1,n):
-                                pred_return[i]=mu+[sum(phi[k]*pred_return[i-1][t] for k in range(p_input)) for t in range(n+1)]+pred_std[i]*modules.np.random.standard_normal(1)+[sum(theta[k]*pred_std[i-1]*modules.np.random.standard_normal(1)[t] for k in range(q_input)) for t in range(n+1))]
-                                bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i])
+
+                        pred_return[0,:]= mu+[sum(phi[i]*data['Log_return_garch'].shift(1)[t] for i in range(p_input)) for t in range(len(data))]+pred_std[0]*modules.np.random.standard_normal(1)+[sum(theta[j]*pred_std[0]*modules.np.random.standard_normal(1)[t] for j in range(q_input)) for t in range(len(data))]
+
+                        bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0,0])
+
+                        for i in range(1,n):
+                            for j in range(1,bound_n):
+                                if dist_type == "normal":
+                                    pred_return[i,j]=mu+[sum(phi[k]*pred_return[i-1,j][t] for k in range(p_input)) for t in range(n+1)]+pred_std[i]*modules.np.random.standard_normal(1)+[sum(theta[k]*pred_std[i-1]*modules.np.random.standard_normal(1)[t] for k in range(q_input)) for t in range(n+1)]
+                                elif dist_type =="t":
+                                    pred_return[i,j]=mu+[sum(phi[k]*pred_return[i-1,j][t] for k in range(p_input)) for t in range(n+1)]+pred_std[i]*modules.np.random.standard_t(nu,1)+[sum(theta[k]*pred_std[i-1]*modules.np.random.standard_t(nu,1)[t] for k in range(q_input)) for t in range(n+1)]
+                                else:
+                                    print("Distribution type is not valid, try i.e. normal, t, skewt...")
+                                    return
+                                bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i,j])
+
                         max_values_ar_garch = []
                         min_values_ar_garch = []
                         for i in range(1, n+1):
@@ -425,12 +479,12 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                             min_values_ar_garch.append(min_value_ar_garch)
                             max_value_ar_garch = max(bounds[i-1,1:bound_n])
                             max_values_ar_garch.append(max_value_ar_garch)
-                        difference=[]
-                        pred_transform_middle = zip(max_values_ar_garch,min_values_ar_garch)
-                        for list1_i, list2_i in pred_transform_middle:
-                            difference.append(list1_i-list2_i)
-                        for i in range(1,n+1):
-                            difference[i-1]=(difference[i-1]/2)+min_values_ar_garch[i-1]
+
+                            difference=[]
+
+                            for i in range(1, n+1):
+                                temp_avg=sum(bounds[i-1,1:bound_n])/bound_n
+                                difference.append(temp_avg)
                     return difference, max_values_ar_garch, min_values_ar_garch
 
 
