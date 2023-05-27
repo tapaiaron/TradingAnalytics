@@ -190,9 +190,8 @@ def mc_model(data,n,sim=10000,day_type="1d",mark_type='Close'):
 def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_not=True,
                     optimizer=True, combined=True, vol_type='GARCH', dist_type='normal',
                     mean_type='constant', o_type=0, arma_resid=False):
-                    if combined == False:
-                        if arma_or_not==True:
-                            def ARMA(data, n, mark_type, optimizer):
+                     
+                     def ARMA(data, n, mark_type, optimizer):
                                 if optimizer == True:
                                     order_aic_bic=[]
                                     for p in range(4):
@@ -266,13 +265,15 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     resid_arima=results.resid
                                     resid_arima=resid_arima[1:]
                                 return mean_forecast, lower_limits, upper_limits, mu, phi, theta, resid_arima, p_input, q_input
-                        else:
-                            def GARCH(data, n, sim, day_type, mark_type, optimizer,vol_type, dist_type, mean_type, o_type, arma_resid):
+                     
+                     def GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type, arma_resid):
                                 if arma_resid == False:
-                                    data['log_return_garch']=data['log_return'].mull(100)
+                                    data['log_return_garch']=data['log_return'].mul(100)
+                                    data.dropna()
                                 else:
                                     resid_arima=ARMA(data, n, mark_type, optimizer)
                                     data['log_return_garch']=resid_arima*100
+                                    data.dropna()
                                 if optimizer == True:
                                     order_aic_bic_garch=[]
                                     for p_garch in range(4):
@@ -296,7 +297,7 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                                 print("Give whole number, maximum parameter ideally should be less than 3.")
                                                 continue
 
-                                    gm_rev=modules.arch(data['log_return_garch'], p=p_input_garch, q=q_input_garch, o=o_type, vol=vol_type, dist=dist_type)
+                                    gm_rev=modules.arch_model(data['log_return_garch'], p=p_input_garch, q=q_input_garch, o=o_type, vol=vol_type, dist=dist_type, mean=mean_type)
                                     gm_rev_result=gm_rev.fit(disp='off')
                                     print(gm_rev_result.summary())
                                     ## GARCH parameters
@@ -309,13 +310,13 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     ## GARCH estimation
                                     sigma_t = modules.np.sqrt(omega + alpha_temp + beta_temp)
                                     if dist_type=="normal":
+                                        nu=None
                                         epsilon_t=sigma_t*modules.np.random.standard_normal(len(sigma_t))
                                     elif dist_type=="t":
                                         nu=gm_rev_result.params['nu']
                                         epsilon_t=sigma_t*modules.np.random.standard_t(nu,len(sigma_t))
                                     else:
                                         print("Distribution type is not valid, try i.e. normal, t, skewt...")
-                                        return
                                     ## GARCH prediction
                                     pred = gm_rev_result.forecast(horizon=n)
                                     pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
@@ -331,7 +332,6 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                         pred_return[0,:]= mu_garch+pred_std[0]*modules.np.random.standard_t(nu, 1)
                                     else:
                                         print("Distribution type is not valid, try i.e. normal, t, skewt...")
-                                        return
 
 
                                     ## Setting the upper and lower bound
@@ -345,7 +345,6 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                                 pred_return[i,j]=mu_garch+pred_std[i-1]*modules.np.random.standard_t(nu,1)
                                             else:
                                                 print("Distribution type is not valid, try i.e. normal, t, skewt...")
-                                                return
                                             bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i,j])
 
                                     max_values_ar_garch = []
@@ -364,7 +363,7 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                 else:          
                                     p_input_garch = 1
                                     q_input_garch = 1
-                                    gm_rev=modules.arch(data['log_return_garch'], p=p_input_garch, q=q_input_garch, o=o_type, vol=vol_type, dist=dist_type)
+                                    gm_rev=modules.arch_model(data['log_return_garch'], p=p_input_garch, q=q_input_garch, o=o_type, vol=vol_type, dist=dist_type, mean=mean_type)
                                     gm_rev_result=gm_rev.fit(disp='off')
                                     print(gm_rev_result.summary())
                                     ## GARCH parameters
@@ -376,7 +375,16 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     beta_temp = beta_params * (gm_rev_result.conditional_volatility**2).shift(1)
                                     ## GARCH estimation
                                     sigma_t = modules.np.sqrt(omega + alpha_params*(gm_rev_result.resid**2).shift(1) + beta_params*(gm_rev_result.conditional_volatility**2).shift(1))
-                                    epsilon_t=sigma_t*modules.np.random.standard_normal(len(sigma_t))
+
+                                    if dist_type=="normal":
+                                        nu=None
+                                        epsilon_t=sigma_t*modules.np.random.standard_normal(len(sigma_t))
+                                    elif dist_type=="t":
+                                        nu=gm_rev_result.params['nu']
+                                        epsilon_t=sigma_t*modules.np.random.standard_t(nu,len(sigma_t))
+                                    else:
+                                        print("Distribution type is not valid, try i.e. normal, t, skewt...")
+
                                     ## GARCH prediction
                                     pred = gm_rev_result.forecast(horizon=n)
                                     pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
@@ -392,7 +400,6 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                         pred_return[0,:]= mu_garch+pred_std[0]*modules.np.random.standard_t(nu, 1)
                                     else:
                                         print("Distribution type is not valid, try i.e. normal, t, skewt...")
-                                        return
 
                                     ## Setting the upper and lower bound
                                     bounds[0,:]=data[mark_type][-1]*modules.math.exp(pred_return[0,0])
@@ -405,7 +412,6 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                                 pred_return[i,j]=mu_garch+pred_std[i-1]*modules.np.random.standard_t(nu,1)
                                             else:
                                                 print("Distribution type is not valid, try i.e. normal, t, skewt...")
-                                                return
                                             bounds[i,j]=bounds[i-1,j]*modules.math.exp(pred_return[i,j])
 
                                     max_values_ar_garch = []
@@ -422,9 +428,26 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                         temp_avg=sum(bounds[i-1,1:bound_n])/bound_n
                                         difference.append(temp_avg)
 
-                            return difference, min_values_ar_garch, max_values_ar_garch, sigma_t, epsilon_t, alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred, nu   
-                    else:
-                        mu, phi, theta, resid_arima, p_input, q_input=ARMA(data, n, mark_type, optimizer)
+                                return difference, min_values_ar_garch, max_values_ar_garch, sigma_t, epsilon_t, alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred, nu
+                     
+                     if combined == False:
+                        if arma_or_not == True:
+                            # ARMA branch
+                            # Call ARMA function and return the result
+                            return ARMA(data, n, mark_type, optimizer)
+                        else:
+                            # GARCH branch
+                            # Call GARCH function and return the result
+                            return GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type, arma_resid)
+                     else:
+                         # Combined branch
+                        if arma_or_not == True:
+                            # Call ARMA function
+                            mu, phi, theta, resid_arima, p_input, q_input=ARMA(data, n, mark_type, optimizer)
+                        else:
+                            mu, phi, theta, resid_arima, p_input, q_input = None, None, None, None, None, None
+                        
+                        # Call GARCH function
                         alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred=GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type)
 
                         if dist_type == "normal":
@@ -433,7 +456,6 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                             nu=GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type)
                         else:
                             print("Distribution type is not valid, try i.e. normal, t, skewt...")
-                            return
 
                         sigma_t = modules.np.sqrt(omega + alpha_temp + beta_temp)
                         if dist_type == "normal":
@@ -442,7 +464,6 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                             epsilon_t=sigma_t*modules.np.random.standard_t(nu,len(sigma_t))
                         else:
                             print("Distribution type is not valid, try i.e. normal, t, skewt...")
-                            return
                         
 
                         phi_temp = [sum(phi[i] * data['Log_return_garch'].shift(i)[t] for i in range(p_input)) for t in range(len(data))]
@@ -485,7 +506,7 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                             for i in range(1, n+1):
                                 temp_avg=sum(bounds[i-1,1:bound_n])/bound_n
                                 difference.append(temp_avg)
-                    return difference, max_values_ar_garch, min_values_ar_garch
+                     return difference, max_values_ar_garch, min_values_ar_garch
 
 
 
