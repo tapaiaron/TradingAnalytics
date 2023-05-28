@@ -81,7 +81,8 @@ def load_data_yahoo(tickerSymbol='META',period='1d', start_date= (modules.dateti
 
 def calc_log_return(data, mark_type='Close'):
     data['log_return']=modules.np.log(data[mark_type]/data[mark_type].shift(1))
-    return data.dropna()
+    data=data.dropna()
+    return data
 
 def hurst(ts):
     """Returns the Hurst Exponent of the time series vector ts"""
@@ -268,12 +269,12 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                      
                      def GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type, arma_resid):
                                 if arma_resid == False:
-                                    data['log_return_garch']=data['log_return'].mul(100)
-                                    data.dropna()
+                                    data['log_return_garch']=modules.np.log(data[mark_type]).diff().mul(100)
+                                    data=data.dropna()
                                 else:
-                                    resid_arima=ARMA(data, n, mark_type, optimizer)
+                                    mean_forecast, lower_limits, upper_limits, mu, phi, theta, resid_arima, p_input, q_input=ARMA(data, n, mark_type, optimizer)
                                     data['log_return_garch']=resid_arima*100
-                                    data.dropna()
+                                    data=data.dropna()
                                 if optimizer == True:
                                     order_aic_bic_garch=[]
                                     for p_garch in range(4):
@@ -321,9 +322,9 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     pred = gm_rev_result.forecast(horizon=n)
                                     pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
                                     pred_std=list(pred_std)
+                                    bound_n=sim
                                     
                                     pred_return=modules.np.zeros(shape=(n,bound_n))
-                                    bound_n=sim
                                     bounds=modules.np.zeros(shape=(n,bound_n))
 
                                     if dist_type == "normal":
@@ -389,9 +390,8 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                                     pred = gm_rev_result.forecast(horizon=n)
                                     pred_std = modules.np.sqrt((pred.variance.values[-1,:])/10000) #variance 100*100
                                     pred_std=list(pred_std)
-
-                                    pred_return=modules.np.zeros(shape=(n,bound_n))
                                     bound_n=sim
+                                    pred_return=modules.np.zeros(shape=(n,bound_n))
                                     bounds=modules.np.zeros(shape=(n,bound_n))
 
                                     if dist_type == "normal":
@@ -441,21 +441,10 @@ def arma_garch_model(data,n,sim=10000,day_type='1d',mark_type='Close',arma_or_no
                             return GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type, arma_resid)
                      else:
                          # Combined branch
-                        if arma_or_not == True:
                             # Call ARMA function
-                            mu, phi, theta, resid_arima, p_input, q_input=ARMA(data, n, mark_type, optimizer)
-                        else:
-                            mu, phi, theta, resid_arima, p_input, q_input = None, None, None, None, None, None
-                        
+                        mean_forecast, lower_limits, upper_limits, mu, phi, theta, resid_arima, p_input, q_input=ARMA(data, n, mark_type, optimizer)
                         # Call GARCH function
-                        alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred=GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type)
-
-                        if dist_type == "normal":
-                            pass
-                        elif dist_type == "t":
-                            nu=GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type)
-                        else:
-                            print("Distribution type is not valid, try i.e. normal, t, skewt...")
+                        difference, min_values_ar_garch, max_values_ar_garch, sigma_t, epsilon_t, alpha_params, beta_params, alpha_temp, beta_temp, omega, mu_garch, pred, nu=GARCH(data, n, sim, day_type, mark_type, optimizer, vol_type, dist_type, mean_type, o_type)
 
                         sigma_t = modules.np.sqrt(omega + alpha_temp + beta_temp)
                         if dist_type == "normal":
